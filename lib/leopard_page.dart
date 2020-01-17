@@ -97,11 +97,9 @@ class TravelDescriptionLabel extends StatelessWidget {
       ),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 20.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: <Widget>[
-            Text("Travel Description", style: TextStyle(fontSize: 18)),
-          ],
+        child: Text(
+          "Travel Description",
+          style: TextStyle(fontSize: 18),
         ),
       ),
     );
