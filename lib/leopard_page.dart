@@ -25,12 +25,19 @@ class LeopardPage extends StatelessWidget {
 class LeopardImage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<PageOffsetNotifier>(
-      builder: (context, notifier, child) {
+    return Consumer2<PageOffsetNotifier, AnimationController>(
+      builder: (context, notifier, animtaion, child) {
         return Positioned(
-          left: -notifier.offset * 0.85,
+          left: -notifier.offset * 0.89,
           width: MediaQuery.of(context).size.width * 1.6,
-          child: child,
+          child: Opacity(
+            opacity: 1 - 0.3 * animtaion.value,
+            child: Transform.scale(
+              alignment: Alignment(0.7,0),
+              scale: 1-0.1*animtaion.value,
+              child: child,
+            ),
+          ),
         );
       },
       child: IgnorePointer(child: Image.asset("assets/leopard.png")),
