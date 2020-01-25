@@ -40,7 +40,7 @@ class LeopardImage extends StatelessWidget {
           ),
         );
       },
-      child: IgnorePointer(child: Image.asset("assets/leopard.png")),
+      child: MapHider(child: IgnorePointer(child: Image.asset("assets/leopard.png"))),
     );
   }
 }

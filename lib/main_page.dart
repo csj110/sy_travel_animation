@@ -35,12 +35,11 @@ class MainPage extends StatefulWidget {
   _MainPageState createState() => _MainPageState();
 }
 
-class _MainPageState extends State<MainPage>
-    with SingleTickerProviderStateMixin {
+class _MainPageState extends State<MainPage> with TickerProviderStateMixin {
   final PageController _pageController = PageController(initialPage: 0);
 
   AnimationController _animationController;
-  AnimationController _mapAnimationController;
+  MapAnimationController _mapAnimationController;
   double get maxHeight => (330 + 14.0);
 
   @override
@@ -49,11 +48,16 @@ class _MainPageState extends State<MainPage>
     _animationController = AnimationController(
         vsync: this, duration: Duration(milliseconds: 1000));
 
-    _mapAnimationController = AnimationController(
+    _mapAnimationController = MapAnimationController(
         vsync: this,
         duration: Duration(
-          milliseconds: 2000,
+          milliseconds: 800,
         ));
+
+    _pageController.addListener(() {
+      if (_pageController.page < 1.0 && _animationController.value != 0)
+        _animationController.fling(velocity: -1);
+    });
   }
 
   @override
@@ -72,41 +76,53 @@ class _MainPageState extends State<MainPage>
         child: ListenableProvider.value(
           value: _mapAnimationController,
           child: Scaffold(
-            body: SafeArea(
-              child: GestureDetector(
-                onVerticalDragUpdate: _handleDragUpdate,
-                onVerticalDragEnd: _handleDragEnd,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: <Widget>[
-                    PageView(
-                      controller: _pageController,
-                      physics: ClampingScrollPhysics(),
+            body: Stack(
+              children: [
+                MapImage(),
+                SafeArea(
+                  child: GestureDetector(
+                    onVerticalDragUpdate: _handleDragUpdate,
+                    onVerticalDragEnd: _handleDragEnd,
+                    child: Stack(
+                      alignment: Alignment.center,
                       children: <Widget>[
-                        LeopardPage(),
-                        VulturePage(),
+                        MapHider(
+                          child: PageView(
+                            controller: _pageController,
+                            physics: ClampingScrollPhysics(),
+                            children: <Widget>[
+                              LeopardPage(),
+                              VulturePage(),
+                            ],
+                          ),
+                        ),
+                        AppBar(),
+                        LeopardImage(),
+                        VultureImage(),
+                        ShareButton(),
+                        PageIndicator(),
+                        ArrowIcon(),
+                        TravelDetailLabel(),
+                        StartCampLabel(),
+                        StartTimeLabel(),
+                        BaseCampLabel(),
+                        BaseTimeLabel(),
+                        DistanceLabel(),
+                        VerticalTravelDots(),
+                        HorizontalTravelDots(),
+                        MapButton(),
+                        VultureIconLabel(),
+                        LeopardIconLabel(),
+                        CurveRoute(),
+                        MapBaseCamp(),
+                        MapLeopardIconLabel(),
+                        MapVultureIconLabel(),
+                        MapStartCampLabel(),
                       ],
                     ),
-                    AppBar(),
-                    LeopardImage(),
-                    VultureImage(),
-                    ShareButton(),
-                    PageIndicator(),
-                    ArrowIcon(),
-                    TravelDetailLabel(),
-                    StartCampLabel(),
-                    StartTimeLabel(),
-                    BaseCampLabel(),
-                    BaseTimeLabel(),
-                    DistanceLabel(),
-                    VerticalTravelDots(),
-                    HorizontalTravelDots(),
-                    MapButton(),
-                    VultureIconLabel(),
-                    LeopardIconLabel(),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -115,10 +131,15 @@ class _MainPageState extends State<MainPage>
   }
 
   void _handleDragUpdate(DragUpdateDetails details) {
+    if (_pageController.page < 0.5 || _mapAnimationController.value != 0)
+      return;
     _animationController.value -= details.primaryDelta / maxHeight;
   }
 
   void _handleDragEnd(DragEndDetails details) {
+    if (_pageController.page < 0.5 || _mapAnimationController.value != 0)
+      return;
+
     if (_animationController.isAnimating ||
         _animationController.status == AnimationStatus.completed) return;
 
@@ -132,6 +153,47 @@ class _MainPageState extends State<MainPage>
     else
       _animationController.fling(
           velocity: _animationController.value < 0.5 ? -2.0 : 2.0);
+  }
+}
+
+class MapImage extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (context, mapAnimation, child) {
+        double scale = 1.2 - .2 * mapAnimation.value;
+        return Transform(
+          transform: Matrix4.identity()
+            ..scale(scale, scale)
+            ..rotateZ(0.05 * math.pi * (1 - mapAnimation.value)),
+          child: Opacity(
+            opacity: mapAnimation.value,
+            child: child,
+          ),
+        );
+      },
+      child: Container(
+        height: double.infinity,
+        width: double.infinity,
+        child: Image.asset("assets/map.png", fit: BoxFit.cover),
+      ),
+    );
+  }
+}
+
+class MapHider extends StatelessWidget {
+  final Widget child;
+
+  const MapHider({Key key, @required this.child}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (context, animation, child) {
+        return Opacity(opacity: 1 - animation.value, child: child);
+      },
+      child: child,
+    );
   }
 }
 
@@ -174,14 +236,16 @@ class VultureImage extends StatelessWidget {
           ),
         );
       },
-      child: IgnorePointer(
-          child: Padding(
-        padding: const EdgeInsets.only(bottom: 30.0),
-        child: Image.asset(
-          "assets/vulture.png",
-          height: MediaQuery.of(context).size.height / 3,
-        ),
-      )),
+      child: MapHider(
+        child: IgnorePointer(
+            child: Padding(
+          padding: const EdgeInsets.only(bottom: 30.0),
+          child: Image.asset(
+            "assets/vulture.png",
+            height: MediaQuery.of(context).size.height / 3,
+          ),
+        )),
+      ),
     );
   }
 }
@@ -208,10 +272,12 @@ class ArrowIcon extends StatelessWidget {
           child: child,
         );
       },
-      child: Icon(
-        Icons.keyboard_arrow_up,
-        size: 28,
-        color: lighterGrey,
+      child: MapHider(
+        child: Icon(
+          Icons.keyboard_arrow_up,
+          size: 28,
+          color: lighterGrey,
+        ),
       ),
     );
   }
@@ -220,45 +286,47 @@ class ArrowIcon extends StatelessWidget {
 class PageIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<PageOffsetNotifier>(
-      builder: (context, notifier, child) => Align(
-        alignment: Alignment.bottomCenter,
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 16.0),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: <Widget>[
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color.fromARGB(
-                    255,
-                    255 - (notifier.page.abs() * 160).round(),
-                    255 - (notifier.page.abs() * 160).round(),
-                    255 - (notifier.page.abs() * 160).round(),
+    return MapHider(
+      child: Consumer<PageOffsetNotifier>(
+        builder: (context, notifier, child) => Align(
+          alignment: Alignment.bottomCenter,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 16.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color.fromARGB(
+                      255,
+                      255 - (notifier.page.abs() * 160).round(),
+                      255 - (notifier.page.abs() * 160).round(),
+                      255 - (notifier.page.abs() * 160).round(),
+                    ),
                   ),
+                  width: 7,
+                  height: 7,
                 ),
-                width: 7,
-                height: 7,
-              ),
-              SizedBox(
-                width: 12,
-                height: 24,
-              ),
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color.fromARGB(
-                    255,
-                    255 - ((1 - notifier.page).abs() * 160).round(),
-                    255 - ((1 - notifier.page).abs() * 160).round(),
-                    255 - ((1 - notifier.page).abs() * 160).round(),
+                SizedBox(
+                  width: 12,
+                  height: 24,
+                ),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color.fromARGB(
+                      255,
+                      255 - ((1 - notifier.page).abs() * 160).round(),
+                      255 - ((1 - notifier.page).abs() * 160).round(),
+                      255 - ((1 - notifier.page).abs() * 160).round(),
+                    ),
                   ),
+                  width: 7,
+                  height: 7,
                 ),
-                width: 7,
-                height: 7,
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -269,8 +337,10 @@ class PageIndicator extends StatelessWidget {
 class VulturePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: VultureCircle(),
+    return MapHider(
+      child: Center(
+        child: VultureCircle(),
+      ),
     );
   }
 }
@@ -287,9 +357,11 @@ class TravelDetailLabel extends StatelessWidget {
           child: child,
         ),
       ),
-      child: Text(
-        "Travel Detail",
-        style: TextStyle(fontSize: 18),
+      child: MapHider(
+        child: Text(
+          "Travel Detail",
+          style: TextStyle(fontSize: 18),
+        ),
       ),
     );
   }
@@ -311,11 +383,13 @@ class StartCampLabel extends StatelessWidget {
           ),
         );
       },
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Text(
-          "Start camp",
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w300),
+      child: MapHider(
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            "Start camp",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w300),
+          ),
         ),
       ),
     );
@@ -338,12 +412,14 @@ class StartTimeLabel extends StatelessWidget {
           ),
         );
       },
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: Text(
-          "02:40 pm",
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w300, color: lighterGrey),
+      child: MapHider(
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Text(
+            "02:40 pm",
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w300, color: lighterGrey),
+          ),
         ),
       ),
     );
@@ -366,11 +442,13 @@ class BaseCampLabel extends StatelessWidget {
           ),
         );
       },
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          "Base camp",
-          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w300),
+      child: MapHider(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            "Base camp",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w300),
+          ),
         ),
       ),
     );
@@ -393,12 +471,14 @@ class BaseTimeLabel extends StatelessWidget {
           ),
         );
       },
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: Text(
-          "07:30 am",
-          style: TextStyle(
-              fontSize: 14, fontWeight: FontWeight.w300, color: lighterGrey),
+      child: MapHider(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            "07:30 am",
+            style: TextStyle(
+                fontSize: 14, fontWeight: FontWeight.w300, color: lighterGrey),
+          ),
         ),
       ),
     );
@@ -420,13 +500,15 @@ class DistanceLabel extends StatelessWidget {
           ),
         );
       },
-      child: Center(
-        child: Text(
-          "72 km",
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: white,
+      child: MapHider(
+        child: Center(
+          child: Text(
+            "72 km",
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: white,
+            ),
           ),
         ),
       ),
@@ -451,7 +533,13 @@ class MapButton extends StatelessWidget {
             style: TextStyle(fontSize: 12),
           ),
           onPressed: () {
-            Provider.of<AnimationController>(context, listen: false).forward();
+            final mapAnimation =
+                Provider.of<MapAnimationController>(context, listen: false);
+            if (Provider.of<AnimationController>(context, listen: false).value < 0.6)
+              return;
+            mapAnimation.value == 0
+                ? mapAnimation.forward()
+                : mapAnimation.reverse();
           },
         ),
       ),
@@ -485,6 +573,7 @@ class HorizontalTravelDots extends StatelessWidget {
   Widget build(BuildContext context) {
     return Consumer2<PageOffsetNotifier, AnimationController>(
       builder: (context, notifier, animation, child) {
+        if (animation.value == 1) return Container();
         double multiplier = math.max(4 * notifier.page - 3, 0);
         double opacity = multiplier;
         if (animation.value > 0) {
@@ -551,9 +640,10 @@ class HorizontalTravelDots extends StatelessWidget {
 class VerticalTravelDots extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<AnimationController>(
-      builder: (context, animation, child) {
-        if (animation.value < 0.2) return Container();
+    return Consumer2<AnimationController, MapAnimationController>(
+      builder: (context, animation, mapAnimation, child) {
+        if (animation.value < 0.2 || mapAnimation.value != 0)
+          return Container();
         double top = 80.0 +
             (1 - math.max(0.0, (animation.value - 0.2) * 1.25)) * (330 + 14) +
             50;
@@ -575,6 +665,17 @@ class VerticalTravelDots extends StatelessWidget {
                 ),
                 Align(
                   alignment: Alignment(0, -1),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: white,
+                    ),
+                    width: 6,
+                    height: 6,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment(0, 1),
                   child: Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -623,16 +724,95 @@ class VerticalTravelDots extends StatelessWidget {
   }
 }
 
+class CurveRoute extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (context, animation, child) {
+        if (animation.value == 0) return Container();
+        double top = 80.0 + 50;
+        double offset = 7.5;
+        double height = 20 - 2 * offset + (330 + 14);
+        double width = MediaQuery.of(context).size.width;
+        return Positioned(
+          top: top + offset,
+          height: height,
+          left: 0,
+          right: 0,
+          child: CustomPaint(
+            painter: CurvePainter(animation.value),
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                Positioned(
+                  top: 1 / 3 * (330 + 14) - 1,
+                  left: width / 2 - 3 + 45 * animation.value,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(width: 2, color: white),
+                      color: mainBlack,
+                    ),
+                    width: 6,
+                    height: 6,
+                  ),
+                ),
+                Positioned(
+                  bottom: 1 / 3 * (330 + 14),
+                  left: width / 2 - 3 + 60 * animation.value,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(width: 2, color: white),
+                      color: mainBlack,
+                    ),
+                    width: 6,
+                    height: 6,
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: width / 2 - 3,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: white,
+                    ),
+                    width: 6,
+                    height: 6,
+                  ),
+                ),
+                Align(
+                  alignment: Alignment(-animation.value * 0.4, 1),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: white,
+                    ),
+                    width: 6,
+                    height: 6,
+                  ),
+                )
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 class VultureIconLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<AnimationController>(
-      builder: (context, animation, child) {
+    return Consumer2<AnimationController, MapAnimationController>(
+      builder: (context, animation, mapAnimation, child) {
         return Positioned(
           top: 80.0 + 330 * 2 / 3 + 40 - 40 * animation.value + 40,
-          right: 40 + 70 * animation.value,
+          right: 40 + 70 * animation.value - mapAnimation.value * 60,
           child: Opacity(
-              opacity: math.max(0.0, (animation.value - 0.75) * 4),
+              opacity: math.min(math.max(0.0, (animation.value - 0.75) * 4),
+                  1 - mapAnimation.value),
               child: child),
         );
       },
@@ -647,13 +827,14 @@ class VultureIconLabel extends StatelessWidget {
 class LeopardIconLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return Consumer<AnimationController>(
-      builder: (context, animation, child) {
+    return Consumer2<AnimationController, MapAnimationController>(
+      builder: (context, animation, mapAnimation, child) {
         return Positioned(
           top: 80.0 + 330 * 1 / 3 + 20,
-          left: 30 + 70 * animation.value,
+          left: 30 + 70 * animation.value - 70 * mapAnimation.value,
           child: Opacity(
-              opacity: math.max(0.0, (animation.value - 0.75) * 4),
+              opacity: math.min(math.max(0.0, (animation.value - 0.75) * 4),
+                  1 - mapAnimation.value),
               child: child),
         );
       },
@@ -684,6 +865,158 @@ class SmallAnimalIconLabel extends StatelessWidget {
           style: TextStyle(fontSize: 10),
         ),
       ],
+    );
+  }
+}
+
+class CurvePainter extends CustomPainter {
+  final double value;
+
+  CurvePainter(this.value);
+  @override
+  void paint(Canvas canvas, Size size) {
+    var paint = Paint();
+
+    paint.color = white;
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 2;
+
+    var startPoint = Offset(size.width / 2, 2);
+    var endPoint = Offset(size.width / 2 + 44 * value, size.height / 3);
+    var controlPoint1 = Offset(size.width / 2 + 60 * value, size.height / 4);
+    var controlPoint2 = Offset(size.width / 2 + 10 * value, size.height / 4);
+
+    var path = Path();
+    path.moveTo(startPoint.dx, startPoint.dy);
+    path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx,
+        controlPoint2.dy, endPoint.dx, endPoint.dy);
+
+    startPoint = endPoint;
+    endPoint = Offset(size.width / 2 + 60 * value, size.height / 3 * 2 - 2);
+    controlPoint1 = Offset(size.width / 2 + 100 * value, size.height / 2);
+    controlPoint2 = Offset(size.width / 2 + 20 * value, size.height / 2);
+    path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx,
+        controlPoint2.dy, endPoint.dx, endPoint.dy);
+
+    startPoint = endPoint;
+    endPoint = Offset(size.width * (0.5 - value * 0.01),
+        (size.height / 3 * 2 - 2) + 30 * value);
+    controlPoint1 = Offset(
+        size.width * (0.5 - value * 0.01) + value * 10, size.height * 0.66);
+    controlPoint2 = Offset(
+        size.width * (0.5 - value * 0.01) + 30 * value, size.height * 0.73);
+    path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx,
+        controlPoint2.dy, endPoint.dx, endPoint.dy);
+
+    startPoint = endPoint;
+    endPoint = Offset(size.width * (1 - 0.4 * value) / 2, size.height - 3);
+    controlPoint1 = Offset(size.width * (1 - 0.4 * value) / 2,
+        size.height * (0.76 + 0.04 * value));
+    controlPoint2 = Offset(size.width * (1 - 0.4 * value) / 2,
+        size.height * (0.86 + 0.03 * value));
+    path.cubicTo(controlPoint1.dx, controlPoint1.dy, controlPoint2.dx,
+        controlPoint2.dy, endPoint.dx, endPoint.dy);
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(CustomPainter oldDelegate) {
+    return false;
+  }
+}
+
+class MapBaseCamp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (_, animation, child) {
+        final double opacity = math.max(0.0, 3 * animation.value - 2);
+        return Positioned(
+          right: 21.0,
+          top: 80.0 + 50,
+          width: (MediaQuery.of(context).size.width - 22) / 3,
+          child: Opacity(
+            opacity: opacity,
+            child: child,
+          ),
+        );
+      },
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          "Base camp",
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w300),
+        ),
+      ),
+    );
+  }
+}
+
+class MapLeopardIconLabel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (context, animation, child) {
+        return Positioned(
+          top: 80.0 + 330 * 1 / 3 + 20 + 15,
+          left: 30 + 100.0,
+          child: Opacity(
+              opacity: math.max(0.0, (animation.value - 0.75) * 4),
+              child: child),
+        );
+      },
+      child: SmallAnimalIconLabel(
+        image: "assets/leopards.png",
+        label: "Leopard",
+      ),
+    );
+  }
+}
+
+class MapVultureIconLabel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (context, animation, child) {
+        return Positioned(
+          top: 80.0 + 330 * 2 / 3 + 40,
+          right: 40 + 40.0,
+          child: Opacity(
+              opacity: math.max(0.0, (animation.value - 0.75) * 4),
+              child: child),
+        );
+      },
+      child: SmallAnimalIconLabel(
+        image: "assets/vultures.png",
+        label: "Vulure",
+      ),
+    );
+  }
+}
+
+class MapStartCampLabel extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<MapAnimationController>(
+      builder: (_, animation, child) {
+        final double opacity = math.max(4 * animation.value - 3, 0);
+        return Positioned(
+          left: 65.0,
+          top: 80.0 + 330 + 14 + 50 + 10,
+          width: (MediaQuery.of(context).size.width - 22) / 3,
+          child: Opacity(
+            opacity: opacity,
+            child: child,
+          ),
+        );
+      },
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: Text(
+          "Start camp",
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w300),
+        ),
+      ),
     );
   }
 }
